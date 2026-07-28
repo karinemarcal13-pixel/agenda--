@@ -19,20 +19,20 @@ const STATUS_LABELS = {
 /* ---------------- STORAGE ---------------- */
 async function loadData(){
   try{
-    const c = await window.storage.get('clientes', false);
-    clientes = c ? JSON.parse(c.value) : [];
+    const c = localStorage.getItem('karine_clientes');
+    clientes = c ? JSON.parse(c) : [];
   }catch(e){ clientes = []; }
   try{
-    const a = await window.storage.get('agendamentos', false);
-    agendamentos = a ? JSON.parse(a.value) : [];
+    const a = localStorage.getItem('karine_agendamentos');
+    agendamentos = a ? JSON.parse(a) : [];
   }catch(e){ agendamentos = []; }
 }
 async function saveClientes(){
-  try{ await window.storage.set('clientes', JSON.stringify(clientes), false); }
+  try{ localStorage.setItem('karine_clientes', JSON.stringify(clientes)); }
   catch(e){ showToast('Erro ao salvar clientes'); }
 }
 async function saveAgendamentos(){
-  try{ await window.storage.set('agendamentos', JSON.stringify(agendamentos), false); }
+  try{ localStorage.setItem('karine_agendamentos', JSON.stringify(agendamentos)); }
   catch(e){ showToast('Erro ao salvar agendamentos'); }
 }
 
@@ -229,7 +229,8 @@ function openClientDetail(id){
 
   openSheet(`
     <h3>${c.nome}</h3>
-    <div style="display:flex; gap:8px; margin-bottom:16px;">
+    <div style="display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;">
+      <button class="mini-btn ok" style="padding:8px 14px;" onclick="scheduleForClient('${c.id}')">Agendar horário</button>
       <button class="mini-btn whats" style="padding:8px 14px;" onclick="openWhatsClient('${c.id}')">WhatsApp</button>
       <button class="mini-btn edit" style="padding:8px 14px;" onclick="editClient('${c.id}')">Editar cliente</button>
     </div>
@@ -318,10 +319,11 @@ function newClientForm(prefillName){
     <input type="tel" id="ncTel" placeholder="43 99999-9999">
     <label>Observação inicial (opcional)</label>
     <textarea id="ncObs" placeholder="Alergias, preferências..."></textarea>
-    <button class="btn-primary" onclick="saveNewClient()">Cadastrar cliente</button>
+    <button class="btn-primary" onclick="saveNewClient(false)">Cadastrar cliente</button>
+    <button class="btn-secondary" onclick="saveNewClient(true)">Cadastrar e marcar horário</button>
   `);
 }
-async function saveNewClient(returnId){
+async function saveNewClient(irParaAgenda){
   const nome = document.getElementById('ncNome').value.trim();
   if(!nome){ showToast('Informe o nome'); return; }
   const tel = document.getElementById('ncTel').value.trim();
@@ -329,10 +331,16 @@ async function saveNewClient(returnId){
   const novo = {id:uid(), nome, telefone:tel, observacoes: obs?[{data:todayISO(), texto:obs}]:[]};
   clientes.push(novo);
   await saveClientes();
-  closeSheet();
-  currentTab='clientes';
-  render();
   showToast('Cliente cadastrada');
+  if(irParaAgenda){
+    currentTab='agenda';
+    render();
+    scheduleForClient(novo.id);
+  }else{
+    closeSheet();
+    currentTab='clientes';
+    render();
+  }
 }
 
 /* ---------------- FINANCEIRO ---------------- */
@@ -411,6 +419,10 @@ function newApptForm(){
 function editAppt(id){
   const a = agendamentos.find(x=>x.id===id);
   apptFormState = {...a};
+  renderApptForm();
+}
+function scheduleForClient(clienteId){
+  apptFormState = {id:null, clienteId, servico:'', data:todayISO(), horario:'', valor:'', formaPagamento:'Pix', status:'pendente'};
   renderApptForm();
 }
 function clientOptions(selectedId){
